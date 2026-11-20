@@ -1,11 +1,20 @@
 from sqlalchemy import select
-from .models import Attribution,Agreement,Signature,Remedy
+from .models import Attribution,Agreement,Signature,Remedy,Separation,NoiseEvent
 from .common import require,lock_case,lock_agreement,get,record,dump,now
+
+def check_attribution_scope(db,caseid,attr):
+    """按最新证据核对归因快照：已转出本卷的采样不能再支撑本卷协议。"""
+    require(attr.complaint_id==caseid and attr.source!='undetermined','归因须属于本卷且来源已核实')
+    sep=get(db,Separation,attr.separation_id)
+    require(sep.state=='done','归因所依据的成分分离未完成')
+    owners=list(db.scalars(select(NoiseEvent.complaint_id).where(NoiseEvent.id.in_(sep.event_ids or []))))
+    require(len(owners)==len(sep.event_ids or []) and all(x==caseid for x in owners),
+            '归因所依据的采样已转出本卷，请重新分离并复核归因后再办协议')
 
 def create_agreement(db,user,caseid,data):
     case=lock_case(db,caseid);require(case.status=='mediation','须先完成人工归因，再起草调解协议')
     attr=get(db,Attribution,data.attribution_id)
-    require(attr.complaint_id==caseid and attr.source!='undetermined','归因须属于本卷且来源已核实')
+    check_attribution_scope(db,caseid,attr);require(attr.source!='undetermined','归因须属于本卷且来源已核实')
     require(not db.scalar(select(Agreement).where(Agreement.complaint_id==caseid,Agreement.state.notin_(['cancelled','fulfilled']))),'本卷已有在途协议')
     row=Agreement(complaint_id=caseid,**data.model_dump());db.add(row);db.flush();record(db,user,'agreement.draft',row.id,caseid);db.commit();return dump(row)
 def sign(db,user,id,data):
@@ -15,6 +24,8 @@ def sign(db,user,id,data):
     row=Signature(agreement_id=id,**data.model_dump());db.add(row);record(db,user,'agreement.sign',id,data.party);db.commit();return dump(row)
 def activate(db,user,id):
     case,a=lock_agreement(db,id);require(a.state=='draft','协议不处于草案')
+    # 转卷与生效可能同时提交：在锁内按最新证据核对，已转走的采样不能支撑原卷协议。
+    check_attribution_scope(db,case.id,get(db,Attribution,a.attribution_id))
     signatures=db.scalars(select(Signature).where(Signature.agreement_id==id)).all()
     require({s.party for s in signatures}=={a.party_a,a.party_b},'双方均签字后协议才能生效')
     a.state='active';a.activated_at=now(db);case.status='remedy';record(db,user,'agreement.activate',id);db.commit();return dump(a)

@@ -1,6 +1,6 @@
 # 栖桥 · 公寓噪声事件分离与调解履约
 
-将匿名投诉、监测授权、频带成分、双方调解、整改复验与观察结案串成一份可追溯的工作簿。六个业务模块，六个操作页面，Python计算与原生HTML/CSS/ES modules。
+将匿名投诉、监测授权、频带成分、双方调解、整改复验与观察结案串成一份可追溯的工作簿。七个业务模块，七个操作页面，Python计算与原生HTML/CSS/ES modules。
 
 ## 场景与工作流
 
@@ -12,12 +12,13 @@
 4. **双方时段协议**：归因确认后起草，指定两位参与方、跨午夜静音窗、阈值和观察天数。双方纸质签字凭据齐全才能由主管生效。
 5. **整改和复验**：责任方须属于协议。所有整改交付后，静音时段的新事件才可作为复验；不允许旧事件或白天低值充数。
 6. **履约与匿名结案**：复发自动重开整改、取消旧观察期；补做整改复验、主管处理复发后重启观察。到期且无未处理复发才结案；结案后可主管重开并保留旧链。
+7. **贴错卷号的转卷**：主管从两卷各挑一条已核实采样作参照，按成分分布相似度给出建议；差值过小视为难分，逐条交主管裁定。获准采样整批移交，目标卷存在同测点同时刻记录则整批退回。已用于支撑生效协议的采样留在原卷；转卷与协议生效同时提交时按最新证据在锁内复核。重试不重复移交，原去向可追溯。
 
 |角色|账号|页面与权限|典型动作|
 |---|---|---|---|
-|协调员|operator|收件、事件、分离、签字凭据、整改/复验登记|登记授权与线下交付收据|
-|协调主管|supervisor|全部页面及受控流转、审计、演示时钟|现场归因、协议生效、处理复发、观察与结案|
-|只读访客|viewer|六页只读；所有写接口403|阅读匿名卷宗与协议状态|
+|协调员|operator|收件、事件、分离、签字凭据、整改/复验登记、整批移交|登记授权、线下交付收据与整批移交|
+|协调主管|supervisor|全部页面及受控流转、审计、演示时钟|现场归因、协议生效、建立转卷批次并裁定难分采样、处理复发、观察与结案|
+|只读访客|viewer|七页只读；所有写接口403|阅读匿名卷宗、转卷建议与移交记录|
 
 三个账号密码均为 `Quiet2026!`。JWT有效8小时；密码PBKDF2存储。只使用模拟别名，不含真实住户资料。
 
@@ -41,7 +42,7 @@ docker compose exec -T backend python -m scripts.seed_demo
 |SQLAlchemy / MySQL8 READ COMMITTED|约束、关系持久化、同卷父行锁|
 |scikit-learn / NumPy / SciPy|NMF成分分解与固定留出评价|
 |Redis7 + Python worker|队列唤醒，数据库持久任务源|
-|原生HTML/CSS/ES modules + Nginx|六页界面、同源API代理|
+|原生HTML/CSS/ES modules + Nginx|七页界面、同源API代理|
 
 ## 算法与可重复性
 
@@ -51,7 +52,7 @@ docker compose exec -T backend python -m scripts.seed_demo
 
 ## 结构与本地开发
 
-`backend/src/models.py` 是投诉/事件/归因/协议/签字/整改/复验/复发/结案关系；case/evidence/agreement/resolution服务分别处理业务，routes只解析请求与授权；两层中间件负责追踪及限流；全局约束错误409。`frontend/src/pages/` 每页负责一种工作任务，`components/common.js` 共享卷宗条、协议条、频带图与成分条，api/store/utils分别负责请求、选卷状态和格式/下载。
+`backend/src/models.py` 是投诉/事件/归因/协议/签字/整改/复验/复发/结案以及转卷批次/条目关系；case/evidence/agreement/resolution/transfer服务分别处理业务，routes只解析请求与授权；两层中间件负责追踪及限流；全局约束错误409。`frontend/src/pages/` 每页负责一种工作任务，`components/common.js` 共享卷宗条、协议条、频带图与成分条，api/store/utils分别负责请求、选卷状态和格式/下载。
 
 本地Python3.12虚拟环境安装backend/requirements.txt，设置 `DATABASE_URL`（MySQL8），`REDIS_URL` 后在backend目录执行 `uvicorn src.app:app --reload`；前端可用Nginx配置同源代理或直接build容器。初始schema见 `backend/migrations/001_schema.md`，create_all不会自动升级已有列。
 

@@ -12,6 +12,7 @@ from .middlewares import TraceMiddleware,LimitMiddleware
 from .case_routes import router as cases
 from .evidence_routes import router as evidence
 from .agreement_routes import router as agreements
+from .transfer_routes import router as transfers
 from .constants import ROLES,CASE_STATES,SOURCE_TYPES,BANDS
 @asynccontextmanager
 async def lifespan(app):
@@ -38,4 +39,4 @@ def login(data:Login,db=Depends(session)):
 def me(u=Depends(current)):return {'username':u.username,'role':u.role}
 @app.get('/enums')
 def enums(u=Depends(current)):return {'roles':ROLES,'case_states':CASE_STATES,'source_types':SOURCE_TYPES,'bands':BANDS}
-app.include_router(cases);app.include_router(evidence);app.include_router(agreements)
+app.include_router(cases);app.include_router(evidence);app.include_router(agreements);app.include_router(transfers)
